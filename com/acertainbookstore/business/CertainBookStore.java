@@ -1,15 +1,7 @@
 package com.acertainbookstore.business;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Random;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -317,7 +309,20 @@ public class CertainBookStore implements BookStore, StockManager {
 	 */
 	@Override
 	public synchronized List<Book> getTopRatedBooks(int numBooks) throws BookStoreException {
-		throw new BookStoreException();
+//		throw new BookStoreException();
+		if (numBooks < 1) {
+			throw new BookStoreException("numBooks = " + numBooks + ", but it must be positive");
+		}
+
+		Comparator<BookStoreBook> comparator = Comparator.comparing(BookStoreBook::getAverageRating);
+		List<BookStoreBook> sortedList = bookMap.entrySet().stream().map(pair->pair.getValue()).sorted(comparator.reversed())
+				.collect(Collectors.toList());
+		int rangePicks = sortedList.size();
+		Set<Integer> tobePicked = new HashSet<>();
+		for (int i = 0; i < Math.min(rangePicks, numBooks); ++i) {
+			tobePicked.add(i);
+		}
+		return tobePicked.stream().map(index -> sortedList.get(index).immutableBook()).collect(Collectors.toList());
 	}
 
 	/*
@@ -326,8 +331,10 @@ public class CertainBookStore implements BookStore, StockManager {
 	 * @see com.acertainbookstore.interfaces.StockManager#getBooksInDemand()
 	 */
 	@Override
-	public synchronized List<StockBook> getBooksInDemand() throws BookStoreException {
-		throw new BookStoreException();
+	public synchronized List<StockBook> getBooksInDemand()  {
+//		throw new BookStoreException();
+		return bookMap.entrySet().stream().map(pair -> pair.getValue()).filter(book -> book.hadSaleMiss())
+				.map(book -> book.immutableStockBook()).collect(Collectors.toList());
 	}
 
 	/*
@@ -342,8 +349,11 @@ public class CertainBookStore implements BookStore, StockManager {
 		for (BookRating br : bookRating) {
 			int isbn = br.getISBN();
 			int rating = br.getRating();
-			if (BookStoreUtility.isInvalidRating(isbn)) {
-				throw new BookStoreException(BookStoreConstants.ISBN + isbn + BookStoreConstants.INVALID);
+
+			validateISBNInStock(isbn);
+
+			if (BookStoreUtility.isInvalidRating(rating)) {
+				throw new BookStoreException(BookStoreConstants.RATING + rating + BookStoreConstants.INVALID);
 			}
 
 			BookStoreBook book = bookMap.get(isbn);
