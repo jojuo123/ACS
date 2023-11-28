@@ -40,7 +40,7 @@ public class StockManagerTest {
 	private static final Integer NUM_COPIES = 5;
 
 	/** The local test. */
-	private static boolean localTest = true;
+	private static boolean localTest = false;
 
 	/** The store manager. */
 	private static StockManager storeManager;
@@ -474,6 +474,18 @@ public class StockManagerTest {
 		booksInStoreList = storeManager.getBooks();
 		assertTrue(booksInStoreList.size() == 0);
 	}
+
+	//testGetBooksInDemand
+	//testGetBooksInDemand:
+	// - add the book
+	// - buy some book more copy than available
+	// - getbookindemand
+	//testGetBooksInDemand:
+	// - buy multiple books
+	// - one fail
+	// - getindemand
+	//testGetBooksInDemand:
+	// -
 
 	/**
 	 * Tear down after class.

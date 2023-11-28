@@ -33,7 +33,7 @@ public class BookStoreTest {
 	private static final int NUM_COPIES = 5;
 
 	/** The local test. */
-	private static boolean localTest = true;
+	private static boolean localTest = false;
 
 	/** The store manager. */
 	private static StockManager storeManager;
@@ -102,6 +102,7 @@ public class BookStoreTest {
 				false);
 	}
 
+	//addMultipleBooks
 	/**
 	 * Method to add a book, executed before every test case is run.
 	 *
@@ -289,6 +290,11 @@ public class BookStoreTest {
 			assertTrue(num_rate == book.getNumTimesRated() && total == book.getTotalRating() && avg_ == book.getAverageRating());
 		}
 	}
+
+	//testGetTopK
+	//testGetTopK: invalid (K<1)
+	//testGetTopK: K > size
+
 
 	/**
 	 * Tests that books with invalid ISBNs cannot be bought.
