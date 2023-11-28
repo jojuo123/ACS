@@ -2,21 +2,16 @@ package com.acertainbookstore.client.tests;
 
 import static org.junit.Assert.*;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
+import com.acertainbookstore.business.*;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.acertainbookstore.business.Book;
-import com.acertainbookstore.business.BookCopy;
-import com.acertainbookstore.business.CertainBookStore;
-import com.acertainbookstore.business.ImmutableStockBook;
-import com.acertainbookstore.business.StockBook;
 import com.acertainbookstore.client.BookStoreHTTPProxy;
 import com.acertainbookstore.client.StockManagerHTTPProxy;
 import com.acertainbookstore.interfaces.BookStore;
@@ -85,9 +80,18 @@ public class BookStoreTest {
 		StockBook book = new ImmutableStockBook(isbn, "Test of Thrones", "George RR Testin'", (float) 10, copies, 0, 0,
 				0, false);
 		booksToAdd.add(book);
+//		book = new ImmutableStockBook(isbn, "Biochemical Testing", "Kwang Zeus'", (float) 119, copies, 0, 0,
+//				0, false);
+//		booksToAdd.add(book);
 		storeManager.addBooks(booksToAdd);
 	}
 
+	public void addBooks(int isbn, String title, String author, float price, int copies, long numSaleMisses, long numTimeRated, long totalRating, boolean editorPick) throws BookStoreException{
+		Set<StockBook> booksToAdd = new HashSet<StockBook>();
+		StockBook book = new ImmutableStockBook(isbn, title, author, price, copies, numSaleMisses, numTimeRated, totalRating, editorPick);
+		booksToAdd.add(book);
+		storeManager.addBooks(booksToAdd);
+	}
 	/**
 	 * Helper method to get the default book used by initializeBooks.
 	 *
@@ -149,6 +153,141 @@ public class BookStoreTest {
 				&& bookInList.getNumTimesRated() == addedBook.getNumTimesRated()
 				&& bookInList.getTotalRating() == addedBook.getTotalRating()
 				&& bookInList.isEditorPick() == addedBook.isEditorPick());
+	}
+
+	@Test
+	public void testRateBooks() throws BookStoreException {
+		addBooks(119103, "Biochemical Testing", "Kwang Zeus'", (float) 119, 1, 2, 2, 10, false);
+		addBooks(1,1);
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 3));
+		ratings.add(new BookRating(119103, 5));
+
+		client.rateBooks(ratings);
+
+		List<StockBook> listBooks = storeManager.getBooks();
+		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
+		numTimeRatedMap.put(119103, 3);
+		numTimeRatedMap.put(TEST_ISBN, 1);
+		numTimeRatedMap.put(1, 0);
+		HashMap<Integer, Integer> totalRateMap = new HashMap<>();
+		totalRateMap.put(119103, 15);
+		totalRateMap.put(TEST_ISBN, 3);
+		totalRateMap.put(1, 0);
+
+		for (StockBook book : listBooks) {
+			int isbn = book.getISBN();
+			int num_rate = numTimeRatedMap.get(isbn).intValue();
+			int total = totalRateMap.get(isbn).intValue();
+			assertTrue(num_rate == book.getNumTimesRated() && total == book.getTotalRating());
+		}
+	}
+
+	@Test
+	public void testOutOfRangeRateBooks() throws BookStoreException {
+		addBooks(119103, "Biochemical Testing", "Kwang Zeus'", (float) 119, 1, 2, 2, 10, false);
+		addBooks(1,1);
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 3));
+		ratings.add(new BookRating(119103, -5));
+
+		try {
+			client.rateBooks(ratings);
+			fail();
+		} catch (BookStoreException ex) {
+			;
+		}
+
+		List<StockBook> listBooks = storeManager.getBooks();
+		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
+		numTimeRatedMap.put(119103, 2);
+		numTimeRatedMap.put(TEST_ISBN, 0);
+		numTimeRatedMap.put(1, 0);
+		HashMap<Integer, Integer> totalRateMap = new HashMap<>();
+		totalRateMap.put(119103, 10);
+		totalRateMap.put(TEST_ISBN, 0);
+		totalRateMap.put(1, 0);
+
+		for (StockBook book : listBooks) {
+			int isbn = book.getISBN();
+			int num_rate = numTimeRatedMap.get(isbn).intValue();
+			int total = totalRateMap.get(isbn).intValue();
+			assertTrue(num_rate == book.getNumTimesRated() && total == book.getTotalRating());
+		}
+	}
+
+	@Test
+	public void testInvalidISBNRateBooks() throws BookStoreException {
+		addBooks(119103, "Biochemical Testing", "Kwang Zeus'", (float) 119, 1, 2, 2, 10, false);
+		addBooks(1,1);
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 3));
+		ratings.add(new BookRating(-1, -5));
+
+		try {
+			client.rateBooks(ratings);
+			fail();
+		} catch (BookStoreException ex) {
+			;
+		}
+
+		List<StockBook> listBooks = storeManager.getBooks();
+		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
+		numTimeRatedMap.put(119103, 2);
+		numTimeRatedMap.put(TEST_ISBN, 0);
+		numTimeRatedMap.put(1, 0);
+		HashMap<Integer, Integer> totalRateMap = new HashMap<>();
+		totalRateMap.put(119103, 10);
+		totalRateMap.put(TEST_ISBN, 0);
+		totalRateMap.put(1, 0);
+
+		for (StockBook book : listBooks) {
+			int isbn = book.getISBN();
+			int num_rate = numTimeRatedMap.get(isbn).intValue();
+			int total = totalRateMap.get(isbn).intValue();
+			assertTrue(num_rate == book.getNumTimesRated() && total == book.getTotalRating());
+		}
+	}
+
+	@Test
+	public void testMultipleRateBook() throws BookStoreException {
+
+		int N = 10;
+		float avg = 0.0f;
+		long sum = 0;
+		ArrayList<Integer> rates = new ArrayList<>(N);
+		for (int i = 0; i < N; i++) {
+			int random = ThreadLocalRandom.current().nextInt(0, 6);
+			rates.add(random);
+			avg += random;
+			sum += random;
+		}
+		avg /= N;
+
+		for (int i : rates) {
+			Set<BookRating> ratings = new HashSet<>();
+			ratings.add(new BookRating(TEST_ISBN, i));
+			client.rateBooks(ratings);
+		}
+
+		List<StockBook> listBooks = storeManager.getBooks();
+		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
+		numTimeRatedMap.put(TEST_ISBN, N);
+		HashMap<Integer, Long> totalRateMap = new HashMap<>();
+		totalRateMap.put(TEST_ISBN, sum);
+		HashMap<Integer, Float> avgRateMap = new HashMap<>();
+		avgRateMap.put(TEST_ISBN, avg);
+
+		for (StockBook book : listBooks) {
+			int isbn = book.getISBN();
+			int num_rate = numTimeRatedMap.get(isbn).intValue();
+			int total = totalRateMap.get(isbn).intValue();
+			float avg_ = avgRateMap.get(isbn).floatValue();
+			assertTrue(num_rate == book.getNumTimesRated() && total == book.getTotalRating() && avg_ == book.getAverageRating());
+		}
 	}
 
 	/**
