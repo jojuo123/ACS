@@ -226,7 +226,7 @@ public class BookStoreTest {
 
 		Set<BookRating> ratings = new HashSet<BookRating>();
 		ratings.add(new BookRating(TEST_ISBN, 3));
-		ratings.add(new BookRating(-1, -5));
+		ratings.add(new BookRating(-1, 5));
 
 		try {
 			client.rateBooks(ratings);
@@ -292,9 +292,67 @@ public class BookStoreTest {
 	}
 
 	//testGetTopK
-	//testGetTopK: invalid (K<1)
-	//testGetTopK: K > size
+	@Test
+	public void testGetTopK() throws BookStoreException {
+		addBooks(119103, "Biochemical Testing", "Kwang Zeus'", (float) 119, 1, 2, 2, 10, false);
+		addBooks(1,1);
 
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 3));
+		ratings.add(new BookRating(119103, 5));
+		ratings.add(new BookRating(1, 4));
+
+		client.rateBooks(ratings);
+		int K = 2;
+		List<Book> listBooks = client.getTopRatedBooks(K);
+		List<Integer> isbns = new ArrayList<>();
+		isbns.add(119103);
+		isbns.add(1);
+
+		for (int i = 0; i < 2; i++) {
+			int isbn = listBooks.get(i).getISBN();
+			int ref_isbn = isbns.get(i);
+			assertTrue(isbn == ref_isbn);
+		}
+	}
+	//testGetTopK: invalid (K<1)
+	@Test
+	public void testOutOfRangeGetTopK() throws BookStoreException {
+		addBooks(119103, "Biochemical Testing", "Kwang Zeus'", (float) 119, 1, 2, 2, 10, false);
+		addBooks(1,1);
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 3));
+		ratings.add(new BookRating(119103, 5));
+		ratings.add(new BookRating(1, 4));
+
+		client.rateBooks(ratings);
+		int K = -2;
+		try {
+			List<Book> listBooks = client.getTopRatedBooks(K);
+			fail();
+		}
+		catch (BookStoreException ex) {
+			;
+		}
+	}
+	//testGetTopK: K > size
+	@Test
+	public void testLargerKGetTopK() throws BookStoreException {
+		addBooks(119103, "Biochemical Testing", "Kwang Zeus'", (float) 119, 1, 2, 2, 10, false);
+		addBooks(1,1);
+
+		Set<BookRating> ratings = new HashSet<BookRating>();
+		ratings.add(new BookRating(TEST_ISBN, 3));
+		ratings.add(new BookRating(119103, 5));
+		ratings.add(new BookRating(1, 4));
+
+		client.rateBooks(ratings);
+		int K = 5;
+		List<Book> listBooks = client.getTopRatedBooks(K);
+
+		assertTrue(listBooks.size() == 3 && listBooks.containsAll(storeManager.getBooks()));
+	}
 
 	/**
 	 * Tests that books with invalid ISBNs cannot be bought.
