@@ -72,7 +72,6 @@ public class BookStoreHTTPMessageHandler extends AbstractHandler {
 
 		response.setStatus(HttpServletResponse.SC_OK);
 		requestURI = request.getRequestURI();
-
 		// Need to do request multiplexing
 		if (!BookStoreUtility.isEmpty(requestURI) && requestURI.toLowerCase().startsWith("/stock")) {
 			// The request is from the store manager; more sophisticated.
