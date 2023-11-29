@@ -33,7 +33,7 @@ public class BookStoreTest {
 	private static final int NUM_COPIES = 5;
 
 	/** The local test. */
-	private static boolean localTest = false;
+	private static boolean localTest = true;
 
 	/** The store manager. */
 	private static StockManager storeManager;
@@ -551,6 +551,60 @@ public class BookStoreTest {
 		assertTrue(booksInStorePreTest.containsAll(booksInStorePostTest)
 				&& booksInStorePreTest.size() == booksInStorePostTest.size());
 	}
+
+	@Test
+	public void testGetInDemand() throws BookStoreException {
+
+		// Try to buy more copies than there are in store.
+		HashSet<BookCopy> booksToBuy = new HashSet<BookCopy>();
+		booksToBuy.add(new BookCopy(TEST_ISBN, NUM_COPIES + 1));
+
+		try {
+			client.buyBooks(booksToBuy);
+			fail();
+		} catch (BookStoreException ex) {
+			;
+		}
+
+		// Check if the book that we tried to buy is now in the in demand books
+		List<StockBook> inDemandBooks = storeManager.getBooksInDemand();
+		StockBook inDemandBook = inDemandBooks.get(0);
+
+        assertEquals(TEST_ISBN, inDemandBook.getISBN());
+	}
+
+	@Test
+	public void testGetInDemandMultiple() throws BookStoreException {
+
+		Set<StockBook> booksToAdd = new HashSet<StockBook>();
+		booksToAdd.add(new ImmutableStockBook(TEST_ISBN + 1, "The Art of Computer Programming", "Donald Knuth",
+				(float) 300, NUM_COPIES, 0, 0, 0, false));
+		booksToAdd.add(new ImmutableStockBook(TEST_ISBN + 2, "The C Programming Language",
+				"Dennis Ritchie and Brian Kerninghan", (float) 50, NUM_COPIES, 0, 0, 0, false));
+
+		storeManager.addBooks(booksToAdd);
+
+		// Try to buy more copies than there are in store.
+		HashSet<BookCopy> booksToBuy = new HashSet<BookCopy>();
+		booksToBuy.add(new BookCopy(TEST_ISBN, NUM_COPIES + 1));
+		booksToBuy.add(new BookCopy(TEST_ISBN + 1, NUM_COPIES - 1));
+		booksToBuy.add(new BookCopy(TEST_ISBN + 2, NUM_COPIES + 1));
+
+		try {
+			client.buyBooks(booksToBuy);
+			fail();
+		} catch (BookStoreException ex) {
+			;
+		}
+
+		// Check if the book that we tried to buy is now in the in demand books
+		List<StockBook> inDemandBooks = storeManager.getBooksInDemand();
+		StockBook inDemandBook1 = inDemandBooks.get(0);
+		StockBook inDemandBook2 = inDemandBooks.get(1);
+
+		assertTrue(TEST_ISBN + 2 ==  inDemandBook1.getISBN() && inDemandBook2.getISBN() == TEST_ISBN);
+	}
+
 
 	/**
 	 * Tear down after class.
