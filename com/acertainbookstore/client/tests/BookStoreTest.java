@@ -308,7 +308,7 @@ public class BookStoreTest {
 		List<Integer> isbns = new ArrayList<>();
 		isbns.add(119103);
 		isbns.add(1);
-
+		assertTrue(listBooks.size() == K);
 		for (int i = 0; i < 2; i++) {
 			int isbn = listBooks.get(i).getISBN();
 			int ref_isbn = isbns.get(i);
