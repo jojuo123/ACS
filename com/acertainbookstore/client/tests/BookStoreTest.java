@@ -168,6 +168,7 @@ public class BookStoreTest {
 		client.rateBooks(ratings);
 
 		List<StockBook> listBooks = storeManager.getBooks();
+		//expected output
 		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
 		numTimeRatedMap.put(119103, 3);
 		numTimeRatedMap.put(TEST_ISBN, 1);
@@ -201,6 +202,7 @@ public class BookStoreTest {
 			;
 		}
 
+		//expected output
 		List<StockBook> listBooks = storeManager.getBooks();
 		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
 		numTimeRatedMap.put(119103, 2);
@@ -235,6 +237,7 @@ public class BookStoreTest {
 			;
 		}
 
+		//expected output
 		List<StockBook> listBooks = storeManager.getBooks();
 		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
 		numTimeRatedMap.put(119103, 2);
@@ -274,6 +277,7 @@ public class BookStoreTest {
 			client.rateBooks(ratings);
 		}
 
+		//expected output
 		List<StockBook> listBooks = storeManager.getBooks();
 		HashMap<Integer, Integer> numTimeRatedMap = new HashMap<>();
 		numTimeRatedMap.put(TEST_ISBN, N);
@@ -308,7 +312,9 @@ public class BookStoreTest {
 		List<Integer> isbns = new ArrayList<>();
 		isbns.add(119103);
 		isbns.add(1);
+		//must have same length
 		assertTrue(listBooks.size() == K);
+		//must have the same order
 		for (int i = 0; i < 2; i++) {
 			int isbn = listBooks.get(i).getISBN();
 			int ref_isbn = isbns.get(i);
@@ -351,6 +357,7 @@ public class BookStoreTest {
 		int K = 5;
 		List<Book> listBooks = client.getTopRatedBooks(K);
 
+		//must have the same length and elements
 		assertTrue(listBooks.size() == 3 && listBooks.containsAll(storeManager.getBooks()));
 	}
 
