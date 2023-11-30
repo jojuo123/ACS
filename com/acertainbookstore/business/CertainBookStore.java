@@ -310,15 +310,18 @@ public class CertainBookStore implements BookStore, StockManager {
 	@Override
 	public synchronized List<Book> getTopRatedBooks(int numBooks) throws BookStoreException {
 //		throw new BookStoreException();
+		//positive numBook
 		if (numBooks < 1) {
 			throw new BookStoreException("numBooks = " + numBooks + ", but it must be positive");
 		}
 
+		//sort the list book based on avg rating
 		Comparator<BookStoreBook> comparator = Comparator.comparing(BookStoreBook::getAverageRating);
 		List<BookStoreBook> sortedList = bookMap.entrySet().stream().map(pair->pair.getValue()).sorted(comparator.reversed())
 				.collect(Collectors.toList());
 		int rangePicks = sortedList.size();
 		Set<Integer> tobePicked = new HashSet<>();
+		//pick out top min(K, size)
 		for (int i = 0; i < Math.min(rangePicks, numBooks); ++i) {
 			tobePicked.add(i);
 		}
@@ -333,6 +336,7 @@ public class CertainBookStore implements BookStore, StockManager {
 	@Override
 	public synchronized List<StockBook> getBooksInDemand()  {
 //		throw new BookStoreException();
+		//only acquire the ones that had sale miss
 		return bookMap.entrySet().stream().map(pair -> pair.getValue()).filter(book -> book.hadSaleMiss())
 				.map(book -> book.immutableStockBook()).collect(Collectors.toList());
 	}
@@ -344,8 +348,7 @@ public class CertainBookStore implements BookStore, StockManager {
 	 */
 	@Override
 	public synchronized void rateBooks(Set<BookRating> bookRating) throws BookStoreException {
-		//throw new BookStoreException();
-		//TODO: implement
+		//check validity of parameters
 		for (BookRating br : bookRating) {
 			int isbn = br.getISBN();
 			int rating = br.getRating();
@@ -357,6 +360,7 @@ public class CertainBookStore implements BookStore, StockManager {
 			}
 		}
 
+		//update the state
 		for (BookRating br : bookRating) {
 			int isbn = br.getISBN();
 			int rating = br.getRating();
