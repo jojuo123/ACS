@@ -161,19 +161,20 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		//only update specific item -> use read lock as intention lock
 		listLock.readLock().lock();
 		List<Integer> lock_list = new ArrayList<>();
-		System.out.println("copy acquire lock");
+//		System.out.println("copy acquire lock");
 		for (BookCopy bookCopy : bookCopiesSet) {
 			isbn = bookCopy.getISBN();
 			try {
 				if (itemLocksMap.containsKey(isbn)) {
 					itemLocksMap.get(isbn).writeLock().lock();
-					System.out.println("copy isbn "+isbn+" acquire lock");
+//					System.out.println("copy isbn "+isbn+" acquire lock");
 					lock_list.add(isbn);
 					validate(bookCopy);
 				} else {
 					throw new BookStoreException(BookStoreConstants.ISBN + isbn + BookStoreConstants.INVALID);
 				}
 			} catch (BookStoreException e) {
+				System.out.println("falied");
 				for (int i : lock_list)
 					itemLocksMap.get(i).writeLock().unlock();
 				listLock.readLock().unlock();
@@ -181,7 +182,7 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 			}
 		}
 
-		System.out.println("copy finish validation");
+//		System.out.println("copy finish validation");
 		BookStoreBook book;
 
 		// Update the number of copies
@@ -190,10 +191,10 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 			numCopies = bookCopy.getNumCopies();
 			book = bookMap.get(isbn);
 			book.addCopies(numCopies);
-			System.out.println("copy isbn "+isbn+" release lock");
+//			System.out.println("copy isbn "+isbn+" release lock");
 			itemLocksMap.get(isbn).writeLock().unlock();
 		}
-		System.out.println("copy release lock");
+//		System.out.println("copy release lock");
 		listLock.readLock().unlock();
 	}
 
@@ -285,7 +286,7 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		Map<Integer, Integer> salesMisses = new HashMap<>();
 		listLock.readLock().lock();
 		List<Integer> lock_list = new ArrayList<>();
-		System.out.println("buy acquire lock");
+//		System.out.println("buy acquire lock");
 		for (BookCopy bookCopyToBuy : bookCopiesToBuy) {
 
 			isbn = bookCopyToBuy.getISBN();
@@ -312,17 +313,8 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 				listLock.readLock().unlock();
 				throw e;
 			}
-//			validate(bookCopyToBuy);
-//
-//			book = bookMap.get(isbn);
-//
-//			if (!book.areCopiesInStore(bookCopyToBuy.getNumCopies())) {
-//				// If we cannot sell the copies of the book, it is a miss.
-//				salesMisses.put(isbn, bookCopyToBuy.getNumCopies() - book.getNumCopies());
-//				saleMiss = true;
-//			}
 		}
-		System.out.println("buy finish validation");
+//		System.out.println("buy finish validation");
 		// We throw exception now since we want to see how many books in the
 		// order incurred misses which is used by books in demand
 		if (saleMiss) {
@@ -342,20 +334,17 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		}
 
 //		System.out.println(bookCopiesToBuy.toArray().toString());
-		for (BookCopy bookCopyToBuy : bookCopiesToBuy) {
-			System.out.println(bookCopyToBuy.getISBN());
-		}
 		// Then make the purchase.
 		for (BookCopy bookCopyToBuy : bookCopiesToBuy) {
 			isbn = bookCopyToBuy.getISBN();
 //			itemLocksMap.get(isbn).writeLock().lock();
-			System.out.println("buy isbn "+isbn+" acquire lock");
+//			System.out.println("buy isbn "+isbn+" acquire lock");
 			book = bookMap.get(bookCopyToBuy.getISBN());
 			book.buyCopies(bookCopyToBuy.getNumCopies());
-			System.out.println("buy isbn "+isbn+" release lock");
+//			System.out.println("buy isbn "+isbn+" release lock");
 			itemLocksMap.get(isbn).writeLock().unlock();
 		}
-		System.out.println("buy book release lock");
+//		System.out.println("buy book release lock");
 		listLock.readLock().unlock();
 	}
 
