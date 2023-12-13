@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import com.acertainbookstore.interfaces.BookStore;
@@ -28,6 +29,8 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 
 	/** The mapping of books from ISBN to {@link BookStoreBook}. */
 	private Map<Integer, BookStoreBook> bookMap = null;
+	private Map<Integer, ReentrantReadWriteLock> itemLocksMap = null;
+	private final ReentrantReadWriteLock listLock = new ReentrantReadWriteLock(true);
 
 	/**
 	 * Instantiates a new {@link CertainBookStore}.
@@ -35,6 +38,7 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 	public TwoLevelLockingConcurrentCertainBookStore() {
 		// Constructors are not synchronized
 		bookMap = new HashMap<>();
+		itemLocksMap = new HashMap<>();
 	}
 	
 	private void validate(StockBook book) throws BookStoreException {
@@ -70,19 +74,33 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 	}	
 	
 	private void validate(BookCopy bookCopy) throws BookStoreException {
+
 		int isbn = bookCopy.getISBN();
 		int numCopies = bookCopy.getNumCopies();
-
-		validateISBNInStock(isbn); // Check if the book has valid ISBN and in stock
+		try {
+			validateISBNInStock(isbn); // Check if the book has valid ISBN and in stock
+		} catch (BookStoreException e) {
+//			itemLocksMap.get(isbn);
+			throw e;
+		}
 
 		if (BookStoreUtility.isInvalidNoCopies(numCopies)) { // Check if the number of the book copy is larger than zero
+//			itemLocksMap.get(isbn).readLock().unlock();
 			throw new BookStoreException(BookStoreConstants.NUM_COPIES + numCopies + BookStoreConstants.INVALID);
 		}
+//		itemLocksMap.get(isbn).readLock().unlock();
 	}
 	
 	private void validate(BookEditorPick editorPickArg) throws BookStoreException {
 		int isbn = editorPickArg.getISBN();
-		validateISBNInStock(isbn); // Check if the book has valid ISBN and in stock
+//		itemLocksMap.get(isbn).readLock().lock();
+		try {
+			validateISBNInStock(isbn); // Check if the book has valid ISBN and in stock
+		} catch (BookStoreException e) {
+//			itemLocksMap.get(isbn).readLock().unlock();
+			throw e;
+		}
+//		itemLocksMap.get(isbn).readLock().unlock();
 	}
 	
 	private void validateISBNInStock(Integer ISBN) throws BookStoreException {
@@ -105,15 +123,23 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 			throw new BookStoreException(BookStoreConstants.NULL_INPUT);
 		}
 
+		listLock.writeLock().lock();
 		// Check if all are there
 		for (StockBook book : bookSet) {
-			validate(book);
+			try {
+				validate(book);
+			} catch (BookStoreException e) {
+				listLock.writeLock().unlock();
+				throw e;
+			}
 		}
 
 		for (StockBook book : bookSet) {
 			int isbn = book.getISBN();
 			bookMap.put(isbn, new BookStoreBook(book));
+			itemLocksMap.put(isbn, new ReentrantReadWriteLock(true));
 		}
+		listLock.writeLock().unlock();
 	}
 
 	/*
@@ -122,27 +148,55 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 	 * @see
 	 * com.acertainbookstore.interfaces.StockManager#addCopies(java.util.Set)
 	 */
+	//
 	public void addCopies(Set<BookCopy> bookCopiesSet) throws BookStoreException {
 		int isbn;
+		boolean flag = false;
 		int numCopies;
 
 		if (bookCopiesSet == null) {
 			throw new BookStoreException(BookStoreConstants.NULL_INPUT);
 		}
-
+		//only update specific item -> use read lock as intention lock
+		listLock.readLock().lock();
+		System.out.println("copy acquire lock");
 		for (BookCopy bookCopy : bookCopiesSet) {
-			validate(bookCopy);
+			isbn = bookCopy.getISBN();
+			try {
+				if (itemLocksMap.containsKey(isbn)) {
+					itemLocksMap.get(isbn).readLock().lock();
+					flag = true;
+					validate(bookCopy);
+					flag = false;
+					itemLocksMap.get(isbn).readLock().unlock();
+				} else {
+					flag = false;
+					throw new BookStoreException(BookStoreConstants.ISBN + isbn + BookStoreConstants.INVALID);
+				}
+			} catch (BookStoreException e) {
+				if (flag)
+					itemLocksMap.get(isbn).readLock().unlock();
+				listLock.readLock().unlock();
+				throw e;
+			}
 		}
 
+		System.out.println("copy finish validation");
 		BookStoreBook book;
 
 		// Update the number of copies
 		for (BookCopy bookCopy : bookCopiesSet) {
 			isbn = bookCopy.getISBN();
+			itemLocksMap.get(isbn).writeLock().lock();
+			System.out.println("copy isbn "+isbn+" acquire lock");
 			numCopies = bookCopy.getNumCopies();
 			book = bookMap.get(isbn);
 			book.addCopies(numCopies);
+			System.out.println("copy isbn "+isbn+" release lock");
+			itemLocksMap.get(isbn).writeLock().unlock();
 		}
+		System.out.println("copy release lock");
+		listLock.readLock().unlock();
 	}
 
 	/*
@@ -151,11 +205,22 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 	 * @see com.acertainbookstore.interfaces.StockManager#getBooks()
 	 */
 	public List<StockBook> getBooks() {
-		Collection<BookStoreBook> bookMapValues = bookMap.values();
+		listLock.readLock().lock();
+//		Collection<BookStoreBook> bookMapValues = bookMap.values();
+//
+//		List<StockBook> ret = bookMapValues.stream()
+//				.map(book -> book.immutableStockBook())
+//				.collect(Collectors.toList());
+		List<StockBook> ret = new ArrayList<>();
+		for (int isbn : bookMap.keySet())
+		{
+			itemLocksMap.get(isbn).readLock().lock();
+			ret.add(bookMap.get(isbn).immutableStockBook());
+			itemLocksMap.get(isbn).readLock().unlock();
+		}
 
-		return bookMapValues.stream()
-				.map(book -> book.immutableStockBook())
-				.collect(Collectors.toList());
+		listLock.readLock().unlock();
+		return ret;
 	}
 
 	/*
@@ -170,15 +235,37 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		if (editorPicks == null) {
 			throw new BookStoreException(BookStoreConstants.NULL_INPUT);
 		}
-
+		listLock.readLock().lock();
 		int isbnValue;
+		boolean flag = false;
 
 		for (BookEditorPick editorPickArg : editorPicks) {
-			validate(editorPickArg);
+			isbnValue = editorPickArg.getISBN();
+			try {
+
+				if (itemLocksMap.containsKey(isbnValue)) {
+					itemLocksMap.get(isbnValue).readLock().lock();
+					flag = true;
+					validate(editorPickArg);
+					flag = false;
+					itemLocksMap.get(isbnValue).readLock().unlock();
+				} else {
+					flag = false;
+					throw new BookStoreException(BookStoreConstants.ISBN + isbnValue + BookStoreConstants.INVALID);
+				}
+			} catch (BookStoreException e) {
+				if (flag)
+					itemLocksMap.get(isbnValue).readLock().unlock();
+				listLock.readLock().unlock();
+				throw e;
+			}
 		}
 
 		for (BookEditorPick editorPickArg : editorPicks) {
+			isbnValue = editorPickArg.getISBN();
+			itemLocksMap.get(isbnValue).writeLock().lock();
 			bookMap.get(editorPickArg.getISBN()).setEditorPick(editorPickArg.isEditorPick());
+			itemLocksMap.get(isbnValue).writeLock().unlock();
 		}
 	}
 
@@ -193,41 +280,86 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		}
 
 		// Check that all ISBNs that we buy are there first.
-		int isbn;
+		int isbn = -1;
+		boolean flag = false;
 		BookStoreBook book;
 		Boolean saleMiss = false;
 
 		Map<Integer, Integer> salesMisses = new HashMap<>();
-
+		listLock.readLock().lock();
+		System.out.println("buy acquire lock");
 		for (BookCopy bookCopyToBuy : bookCopiesToBuy) {
+
 			isbn = bookCopyToBuy.getISBN();
+			try {
 
-			validate(bookCopyToBuy);
+				if (itemLocksMap.containsKey(isbn)) {
+					itemLocksMap.get(isbn).readLock().lock();
+					System.out.println();
+					flag = true;
+					validate(bookCopyToBuy);
+					book = bookMap.get(isbn);
 
-			book = bookMap.get(isbn);
-
-			if (!book.areCopiesInStore(bookCopyToBuy.getNumCopies())) {
-				// If we cannot sell the copies of the book, it is a miss.
-				salesMisses.put(isbn, bookCopyToBuy.getNumCopies() - book.getNumCopies());
-				saleMiss = true;
+					if (!book.areCopiesInStore(bookCopyToBuy.getNumCopies())) {
+						// If we cannot sell the copies of the book, it is a miss.
+						salesMisses.put(isbn, bookCopyToBuy.getNumCopies() - book.getNumCopies());
+						saleMiss = true;
+					}
+					flag = false;
+					itemLocksMap.get(isbn).readLock().unlock();
+				} else {
+					flag = false;
+					throw new BookStoreException(BookStoreConstants.ISBN + isbn + BookStoreConstants.INVALID);
+				}
+			} catch (BookStoreException e) {
+				if (flag)
+					itemLocksMap.get(isbn).readLock().unlock();
+				listLock.readLock().unlock();
+				throw e;
 			}
+//			validate(bookCopyToBuy);
+//
+//			book = bookMap.get(isbn);
+//
+//			if (!book.areCopiesInStore(bookCopyToBuy.getNumCopies())) {
+//				// If we cannot sell the copies of the book, it is a miss.
+//				salesMisses.put(isbn, bookCopyToBuy.getNumCopies() - book.getNumCopies());
+//				saleMiss = true;
+//			}
 		}
-
+		System.out.println("buy finish validation");
 		// We throw exception now since we want to see how many books in the
 		// order incurred misses which is used by books in demand
 		if (saleMiss) {
 			for (Map.Entry<Integer, Integer> saleMissEntry : salesMisses.entrySet()) {
+				isbn = saleMissEntry.getKey();
+				itemLocksMap.get(isbn).writeLock().lock();
+//				System.out.println("buy isbn "+isbn+" acquire lock");
 				book = bookMap.get(saleMissEntry.getKey());
 				book.addSaleMiss(saleMissEntry.getValue());
+//				System.out.println("buy isbn "+isbn+" release lock");
+				itemLocksMap.get(isbn).writeLock().unlock();
 			}
+			listLock.readLock().unlock();
 			throw new BookStoreException(BookStoreConstants.BOOK + BookStoreConstants.NOT_AVAILABLE);
 		}
 
+//		System.out.println(bookCopiesToBuy.toArray().toString());
+		for (BookCopy bookCopyToBuy : bookCopiesToBuy) {
+			System.out.println(bookCopyToBuy.getISBN());
+		}
 		// Then make the purchase.
 		for (BookCopy bookCopyToBuy : bookCopiesToBuy) {
+			isbn = bookCopyToBuy.getISBN();
+			itemLocksMap.get(isbn).writeLock().lock();
+			System.out.println("buy isbn "+isbn+" acquire lock");
 			book = bookMap.get(bookCopyToBuy.getISBN());
 			book.buyCopies(bookCopyToBuy.getNumCopies());
+			System.out.println("buy isbn "+isbn+" release lock");
+			itemLocksMap.get(isbn).writeLock().unlock();
 		}
+		System.out.println("buy book release lock");
+		listLock.readLock().unlock();
 	}
 
 	/*
@@ -241,14 +373,37 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		if (isbnSet == null) {
 			throw new BookStoreException(BookStoreConstants.NULL_INPUT);
 		}
-
+		listLock.readLock().lock();
+		boolean flag = false;
 		for (Integer ISBN : isbnSet) {
-			validateISBNInStock(ISBN);
+			try {
+				if (itemLocksMap.containsKey(ISBN)) {
+					itemLocksMap.get(ISBN).readLock().lock();
+					flag = true;
+					validateISBNInStock(ISBN);
+					flag = false;
+					itemLocksMap.get(ISBN).readLock().unlock();
+				} else {
+					flag = false;
+					throw new BookStoreException(BookStoreConstants.ISBN + ISBN + BookStoreConstants.INVALID);
+				}
+			} catch (BookStoreException e) {
+				if (flag)
+					itemLocksMap.get(ISBN).readLock().unlock();
+				listLock.readLock().unlock();
+				throw e;
+			}
 		}
 
-		return isbnSet.stream()
-				.map(isbn -> bookMap.get(isbn).immutableStockBook())
-				.collect(Collectors.toList());
+		List<StockBook> ret = new ArrayList<>();
+		for (int isbn : isbnSet) {
+			itemLocksMap.get(isbn).readLock().lock();
+			ret.add(bookMap.get(isbn).immutableStockBook());
+			itemLocksMap.get(isbn).readLock().lock();
+		}
+
+		listLock.readLock().lock();
+		return ret;
 	}
 
 	/*
@@ -261,14 +416,45 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 			throw new BookStoreException(BookStoreConstants.NULL_INPUT);
 		}
 
-		// Check that all ISBNs that we rate are there to start with.
+		listLock.readLock().lock();
+		boolean flag = false;
 		for (Integer ISBN : isbnSet) {
-			validateISBNInStock(ISBN);
+			try {
+				if (itemLocksMap.containsKey(ISBN)) {
+					itemLocksMap.get(ISBN).readLock().lock();
+					flag = true;
+					validateISBNInStock(ISBN);
+					flag = false;
+					itemLocksMap.get(ISBN).readLock().unlock();
+				} else {
+					flag = false;
+					throw new BookStoreException(BookStoreConstants.ISBN + ISBN + BookStoreConstants.INVALID);
+				}
+			} catch (BookStoreException e) {
+				if (flag)
+					itemLocksMap.get(ISBN).readLock().unlock();
+				listLock.readLock().unlock();
+				throw e;
+			}
 		}
 
-		return isbnSet.stream()
-				.map(isbn -> bookMap.get(isbn).immutableBook())
-				.collect(Collectors.toList());
+		List<Book> ret = new ArrayList<>();
+		for (int isbn : isbnSet) {
+			itemLocksMap.get(isbn).readLock().lock();
+			ret.add(bookMap.get(isbn).immutableBook());
+			itemLocksMap.get(isbn).readLock().lock();
+		}
+		listLock.readLock().unlock();
+		return ret;
+
+		// Check that all ISBNs that we rate are there to start with.
+//		for (Integer ISBN : isbnSet) {
+//			validateISBNInStock(ISBN);
+//		}
+
+//		return isbnSet.stream()
+//				.map(isbn -> bookMap.get(isbn).immutableBook())
+//				.collect(Collectors.toList());
 	}
 
 	/*
@@ -281,10 +467,15 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 			throw new BookStoreException("numBooks = " + numBooks + ", but it must be positive");
 		}
 
-		List<BookStoreBook> listAllEditorPicks = bookMap.entrySet().stream()
-				.map(pair -> pair.getValue())
-				.filter(book -> book.isEditorPick())
-				.collect(Collectors.toList());
+		listLock.readLock().lock();
+
+		List<BookStoreBook> listAllEditorPicks = new ArrayList<>();
+		for (int isbn : bookMap.keySet()) {
+			itemLocksMap.get(isbn).readLock().lock();
+			if(bookMap.get(isbn).isEditorPick())
+				listAllEditorPicks.add(bookMap.get(isbn));
+			itemLocksMap.get(isbn).readLock().lock();
+		}
 
 		// Find numBooks random indices of books that will be picked.
 		Random rand = new Random();
@@ -309,9 +500,13 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		}
 
 		// Return all the books by the randomly chosen indices.
-		return tobePicked.stream()
+
+		List<Book> ret =  tobePicked.stream()
 				.map(index -> listAllEditorPicks.get(index).immutableBook())
 				.collect(Collectors.toList());
+
+		listLock.readLock().unlock();
+		return ret;
 	}
 
 	/*
@@ -350,7 +545,10 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 	 * @see com.acertainbookstore.interfaces.StockManager#removeAllBooks()
 	 */
 	public void removeAllBooks() throws BookStoreException {
+		listLock.writeLock().lock();
 		bookMap.clear();
+		itemLocksMap.clear();
+		listLock.writeLock().unlock();
 	}
 
 	/*
@@ -364,6 +562,7 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 			throw new BookStoreException(BookStoreConstants.NULL_INPUT);
 		}
 
+		listLock.writeLock().lock();
 		for (Integer ISBN : isbnSet) {
 			if (BookStoreUtility.isInvalidISBN(ISBN)) {
 				throw new BookStoreException(BookStoreConstants.ISBN + ISBN + BookStoreConstants.INVALID);
@@ -377,5 +576,6 @@ public class TwoLevelLockingConcurrentCertainBookStore implements BookStore, Sto
 		for (int isbn : isbnSet) {
 			bookMap.remove(isbn);
 		}
+		listLock.writeLock().unlock();
 	}
 }

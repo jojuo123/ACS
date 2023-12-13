@@ -42,7 +42,7 @@ public class CustomTest {
     private static boolean localTest = true;
 
     /** Single lock test */
-    private static boolean singleLock = true;
+    private static boolean singleLock = false;
 
 
     /** The store manager. */
@@ -148,7 +148,7 @@ public class CustomTest {
         class BuyBooks implements Runnable {
             public void run() {
                 System.out.println(Thread.currentThread().getName() + " buying books");
-                for (int i = 0; i < NUM_COPIES; ++i) {
+                for (int i = 0; i < NUM_COPIES-1; ++i) {
                     try {
                         client.buyBooks(booksToBuy);
                     } catch (BookStoreException e) {
@@ -161,7 +161,7 @@ public class CustomTest {
         class CopyBooks implements Runnable {
             public void run() {
                 System.out.println(Thread.currentThread().getName() + " copying books");
-                for (int i = 0; i < NUM_COPIES; ++i) {
+                for (int i = 0; i < NUM_COPIES-1; ++i) {
                     try {
                         storeManager.addCopies(booksToCopy);
                     } catch (BookStoreException e) {
@@ -185,6 +185,60 @@ public class CustomTest {
         List<StockBook> stockBooks = storeManager.getBooks();
         assertEquals(1, stockBooks.size());
         assertEquals(NUM_COPIES, stockBooks.get(0).getNumCopies());
+    }
+
+    volatile boolean valid = true;
+    @Test
+    public void testConcurencyBuyCopyGet() throws BookStoreException, InterruptedException{
+
+        Set<BookCopy> booksToBuy = new HashSet<BookCopy>();
+        booksToBuy.add(new BookCopy(TEST_ISBN, 2));
+        Set<BookCopy> booksToCopy = new HashSet<>();
+        booksToCopy.add(new BookCopy(TEST_ISBN, 2));
+        class Client1 implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " buying books");
+                for (int i = 0; i < 60; ++i) {
+                    try {
+                        client.buyBooks(booksToBuy);
+                        storeManager.addCopies(booksToCopy);
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+        valid = true;
+        class Client2 implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " get books");
+                for (int i = 0; i < 60; ++i) {
+                    try {
+                        List<StockBook> listBooks = storeManager.getBooks();
+                        int k = listBooks.get(0).getNumCopies();
+//                        System.out.println("num books " + k);
+                        if (k != NUM_COPIES && k != NUM_COPIES - 2) {
+                            valid = false;
+                        }
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+
+        Thread t1 = new Thread(new Client1());
+        Thread t2 = new Thread(new Client2());
+        t1.setName("buyBooks");
+        t2.setName("copyBooks");
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        assertTrue(valid);
     }
 
     /**
