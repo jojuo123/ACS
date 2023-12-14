@@ -132,6 +132,7 @@ public class CustomTest {
         storeManager.removeAllBooks();
     }
 
+    //test 1: check buy + copy concurrency
     @Test
     public void testConcurrentAddCopiesDefaultBook() throws BookStoreException, InterruptedException {
 
@@ -139,7 +140,6 @@ public class CustomTest {
         booksToBuy.add(new BookCopy(TEST_ISBN, 1));
         Set<BookCopy> booksToCopy = new HashSet<>();
         booksToCopy.add(new BookCopy(TEST_ISBN, 1));
-//		storeManager.addCopies(booksToCopy);
 
         class BuyBooks implements Runnable {
             public void run() {
@@ -183,6 +183,7 @@ public class CustomTest {
         assertEquals(NUM_COPIES, stockBooks.get(0).getNumCopies());
     }
 
+    //check if adding + buying concurrency is before-or-after
     @Test
     public void testConcurrentAddUpdate() throws BookStoreException, InterruptedException {
 
@@ -240,6 +241,7 @@ public class CustomTest {
         }
     }
 
+    //test if adding and deletion all is before-or-after
     @Test
     public void testConcurrentAddDelete() throws BookStoreException, InterruptedException {
         int initial = 10;
@@ -302,6 +304,7 @@ public class CustomTest {
     }
 
 
+    //test: both T1 and T2 update editor choice (with overlapped isbns)
     @Test
     public void testConcurrentMultipleEditorPicks() throws BookStoreException, InterruptedException {
         int initialAddedBooks = 10;
@@ -376,6 +379,7 @@ public class CustomTest {
         assertEquals(books.size(), 10);
     }
 
+    //test deleting and getting is all-or-nothing and before-or-after
     @Test
     public void testConcurrentDeleteGet() throws BookStoreException, InterruptedException {
 
@@ -437,6 +441,7 @@ public class CustomTest {
     }
 
     volatile boolean valid = true;
+    //test 2: T1 buy + copy, T2 getbooks (T2 should get the original size or size - no_of_bought_books)
     @Test
     public void testConcurencyBuyCopyGet() throws BookStoreException, InterruptedException{
 
