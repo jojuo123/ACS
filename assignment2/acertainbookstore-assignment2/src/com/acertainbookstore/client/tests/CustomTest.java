@@ -2,23 +2,18 @@ package com.acertainbookstore.client.tests;
 
 import static org.junit.Assert.*;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import com.acertainbookstore.business.*;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.acertainbookstore.business.Book;
-import com.acertainbookstore.business.BookCopy;
-import com.acertainbookstore.business.SingleLockConcurrentCertainBookStore;
-import com.acertainbookstore.business.ImmutableStockBook;
-import com.acertainbookstore.business.StockBook;
-import com.acertainbookstore.business.TwoLevelLockingConcurrentCertainBookStore;
 import com.acertainbookstore.client.BookStoreHTTPProxy;
 import com.acertainbookstore.client.StockManagerHTTPProxy;
 import com.acertainbookstore.interfaces.BookStore;
@@ -186,6 +181,259 @@ public class CustomTest {
         List<StockBook> stockBooks = storeManager.getBooks();
         assertEquals(1, stockBooks.size());
         assertEquals(NUM_COPIES, stockBooks.get(0).getNumCopies());
+    }
+
+    @Test
+    public void testConcurrentAddUpdate() throws BookStoreException, InterruptedException {
+
+        Set<BookCopy> booksToBuy = new HashSet<BookCopy>();
+        booksToBuy.add(new BookCopy(TEST_ISBN, 1));
+//		storeManager.addCopies(booksToCopy);
+
+        class AddBooks implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " adding books");
+                for (int i = 0; i < 15; ++i) {
+                    try {
+                        Set<StockBook> booksToAdd = new HashSet<StockBook>();
+                        StockBook book = new ImmutableStockBook(TEST_ISBN+i+1, "Test of Thrones", "George RR Testin'", (float) 10, 10, 0, 0,
+                                0, false);
+                        booksToAdd.add(book);
+                        storeManager.addBooks(booksToAdd);
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+
+        class BuyBooks implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " buying books");
+                for (int i = 0; i < NUM_COPIES-1; ++i) {
+                    try {
+                        client.buyBooks(booksToBuy);
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+
+        Thread t1 = new Thread(new AddBooks());
+        Thread t2 = new Thread(new BuyBooks());
+        t1.setName("addBooks");
+        t2.setName("buyBooks");
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        // Check if after update and inserts, we have 15 + 1 books and the proper ammound of books has been sold
+        List<StockBook> stockBooks = storeManager.getBooks();
+        assertEquals(16, stockBooks.size());
+        for (StockBook b: stockBooks){
+            if(b.getISBN() == TEST_ISBN)
+                assertEquals(1, b.getNumCopies());
+        }
+    }
+
+    @Test
+    public void testConcurrentAddDelete() throws BookStoreException, InterruptedException {
+        int initial = 10;
+        // Initialize with some books
+        for (int i = 0; i < initial; ++i) {
+            try {
+                Set<StockBook> booksToAdd = new HashSet<StockBook>();
+                StockBook book = new ImmutableStockBook(TEST_ISBN+i+1, "Test of Thrones", "George RR Testin'", (float) 10, 10, 0, 0,
+                        0, false);
+                booksToAdd.add(book);
+                storeManager.addBooks(booksToAdd);
+            } catch (BookStoreException e) {
+                ;
+            }
+        }
+
+        class AddBooks implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " adding books");
+                for (int i = 0; i < initial; ++i) {
+                    try {
+                        Set<StockBook> booksToAdd = new HashSet<StockBook>();
+                        StockBook book = new ImmutableStockBook(TEST_ISBN+i+initial+1, "Test of Thrones", "George RR Testin'", (float) 10, 10, 0, 0,
+                                0, false);
+                        booksToAdd.add(book);
+                        storeManager.addBooks(booksToAdd);
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+
+        class DeleteBooks implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " removing all books");
+                for (int i = 0; i < initial-2; ++i) {
+                    try {
+                        storeManager.removeAllBooks();
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+
+        Thread t1 = new Thread(new AddBooks());
+        Thread t2 = new Thread(new DeleteBooks());
+        t1.setName("addBooks");
+        t2.setName("removeBooks");
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        List<StockBook> stockBooks = storeManager.getBooks();
+        assertTrue(stockBooks.size() <= initial);
+    }
+
+
+    @Test
+    public void testConcurrentMultipleEditorPicks() throws BookStoreException, InterruptedException {
+        int initialAddedBooks = 10;
+        // Initialize with some books
+        for (int i = 0; i < initialAddedBooks; ++i) {
+            try {
+                Set<StockBook> booksToAdd = new HashSet<StockBook>();
+                StockBook book = new ImmutableStockBook(TEST_ISBN+i+1, "Test of Thrones", "George RR Testin'", (float) 10, 10, 0, 0,
+                        0, false);
+                booksToAdd.add(book);
+                storeManager.addBooks(booksToAdd);
+            } catch (BookStoreException e) {
+                ;
+            }
+        }
+
+        class Editor1 implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " editing books");
+                for (int i = 0; i < 5; ++i) {
+                    try {
+
+                        Set<BookEditorPick> editorPicksVals = new HashSet<BookEditorPick>();
+                        BookEditorPick editorPick = new BookEditorPick(TEST_ISBN+i+1, true);
+                        editorPicksVals.add(editorPick);
+                        storeManager.updateEditorPicks(editorPicksVals);
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+
+        class Editor2 implements Runnable {
+            public void run() {
+                System.out.println(Thread.currentThread().getName() + " editing books");
+                for (int i = 3; i <10; ++i) {
+                    try {
+
+                        Set<BookEditorPick> editorPicksVals = new HashSet<BookEditorPick>();
+                        BookEditorPick editorPick = new BookEditorPick(TEST_ISBN+i+1, true);
+                        editorPicksVals.add(editorPick);
+                        storeManager.updateEditorPicks(editorPicksVals);
+                    } catch (BookStoreException e) {
+                        ;
+                    }
+                }
+            }
+        }
+
+
+        Thread t1 = new Thread(new Editor1());
+        Thread t2 = new Thread(new Editor2());
+        t1.setName("edit1");
+        t2.setName("edit2");
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        // get all picks
+        List<Book> books = client.getEditorPicks(12);
+        Set<Integer> set_isbn = new HashSet<>();
+        set_isbn = books.stream().map(Book::getISBN).collect(Collectors.toSet());
+        Set<Integer> expected = new HashSet<>();
+        for (int i = TEST_ISBN+1; i < TEST_ISBN+1 + 10; ++i) {
+            expected.add(i);
+        }
+        assertEquals(expected, set_isbn);
+        assertEquals(books.size(), 10);
+    }
+
+    @Test
+    public void testConcurrentDeleteGet() throws BookStoreException, InterruptedException {
+
+        Set<Integer> isbns = new HashSet<>();
+        for (int i = 0; i < 5; ++i) {
+            isbns.add(TEST_ISBN+i);
+        }
+
+        int initial = 10;
+        // Initialize with some books
+        for (int i = 0; i < initial; ++i) {
+            try {
+                Set<StockBook> booksToAdd = new HashSet<StockBook>();
+                StockBook book = new ImmutableStockBook(TEST_ISBN+i+1, "Test of Thrones", "George RR Testin'", (float) 10, 10, 0, 0,
+                        0, false);
+                booksToAdd.add(book);
+                storeManager.addBooks(booksToAdd);
+            } catch (BookStoreException e) {
+                ;
+            }
+        }
+
+        class DeleteBooks implements Runnable {
+            public void run() {
+                try {
+                    storeManager.removeBooks(isbns);
+                } catch (BookStoreException e) {
+                    ;
+                }
+            }
+        }
+        valid = true;
+        class GetBooks implements Runnable {
+            public void run() {
+                try {
+                    List<Book> list_books = client.getBooks(isbns);
+                    if (list_books.size() != 0 && list_books.size() != isbns.size())
+                        valid = false;
+                } catch (BookStoreException e) {
+                    valid = true;
+                    ;
+                }
+            }
+        }
+
+        Thread t1 = new Thread(new DeleteBooks());
+        Thread t2 = new Thread(new GetBooks());
+        t1.setName("deleteBooks");
+        t2.setName("getBooks");
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+//        List<StockBook> stockBooks = storeManager.getBooks();
+        assertTrue(valid);
     }
 
     volatile boolean valid = true;
