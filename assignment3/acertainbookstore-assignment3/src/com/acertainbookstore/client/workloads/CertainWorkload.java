@@ -142,7 +142,8 @@ public class CertainWorkload {
 				{String.valueOf(workerRunResults.size()), String.valueOf(throughput), String.valueOf(avgLatency), String.valueOf(fail_goodput), String.valueOf(fail_customer_rate)};
 		String line = Stream.of(dataline).collect(Collectors.joining(","));
 		try {
-			FileWriter fw = new FileWriter("../assignment3/result.csv", true);
+
+			FileWriter fw = new FileWriter("./result.csv", true);
 			BufferedWriter bw = new BufferedWriter(fw);
 			bw.write(line);
 			System.out.println(line);
