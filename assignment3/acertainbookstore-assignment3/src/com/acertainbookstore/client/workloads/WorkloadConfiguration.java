@@ -11,7 +11,7 @@ import com.acertainbookstore.interfaces.StockManager;
  */
 public class WorkloadConfiguration {
 	private int numBooksToBuy = 5;
-	private int numBookCopiesToBuy = 20;
+	private int numBookCopiesToBuy = 1;
 	private int numEditorPicksToGet = 10;
 	private int numAddCopies = 10;
 	private int numBooksToAdd = 5;
@@ -28,7 +28,12 @@ public class WorkloadConfiguration {
 
 	public WorkloadConfiguration(BookStore bookStore, StockManager stockManager) throws Exception {
 		// Create a new one so that it is not shared
-		bookSetGenerator = new BookSetGenerator();
+//		bookSetGenerator = new BookSetGenerator();
+		this.bookSetGenerator = new BookSetGenerator(
+				10, 20, 5.0f, 20.0f,
+				5, 70, 0, 10,
+				5, 100, 0.5f
+		);
 		this.bookStore = bookStore;
 		this.stockManager = stockManager;
 	}

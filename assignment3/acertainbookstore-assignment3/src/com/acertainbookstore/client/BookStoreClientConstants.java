@@ -12,7 +12,7 @@ public final class BookStoreClientConstants {
 	public static final int CLIENT_MAX_CONNECTION_ADDRESS = 200;
 
 	/** The Constant CLIENT_MAX_THREADSPOOL_THREADS. */
-	public static final int CLIENT_MAX_THREADSPOOL_THREADS = 250;
+	public static final int CLIENT_MAX_THREADSPOOL_THREADS = 500;
 
 	/** The Constant CLIENT_MAX_TIMEOUT_MILLISECS. */
 	public static final int CLIENT_MAX_TIMEOUT_MILLISECS = 30000;

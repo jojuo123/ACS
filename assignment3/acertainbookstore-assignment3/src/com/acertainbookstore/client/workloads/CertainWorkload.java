@@ -17,10 +17,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.acertainbookstore.business.CertainBookStore;
+import com.acertainbookstore.client.BookStoreClientConstants;
 import com.acertainbookstore.client.BookStoreHTTPProxy;
 import com.acertainbookstore.client.StockManagerHTTPProxy;
 import com.acertainbookstore.interfaces.BookStore;
 import com.acertainbookstore.interfaces.StockManager;
+import com.acertainbookstore.server.BookStoreHTTPServer;
 import com.acertainbookstore.utils.BookStoreConstants;
 import com.acertainbookstore.utils.BookStoreException;
 
@@ -34,15 +36,17 @@ import com.acertainbookstore.utils.BookStoreException;
 public class CertainWorkload {
 
 	public static List<String[]> dataLines;
+	private static String local = "";
 
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) throws Exception {
 		dataLines = new ArrayList<>();
-		int numConcurrentWorkloadThreads = 10;
+		int numConcurrentWorkloadThreads = 500;
 		String serverAddress = "http://localhost:8081";
 		boolean localTest = true;
+		local = localTest ? "local" : "RPC";
 		List<WorkerRunResult> workerRunResults = new ArrayList<WorkerRunResult>();
 		List<Future<WorkerRunResult>> runResults = new ArrayList<Future<WorkerRunResult>>();
 
@@ -125,22 +129,29 @@ public class CertainWorkload {
 
 		float failRatio = 1.0f - goodput / throughput;
 		if (failRatio > 0.01) {
-			System.out.println("goodput and throughput are not closed enough");
+			System.out.println("goodput and throughput are not closed enough: " + String.valueOf(failRatio));
 			fail_goodput = 1;
 		}
 
 		float customerRatio = 1.0f * totalInteractions / totalRuns;
 		if (!(customerRatio > 0.55 && customerRatio < 0.65)) {
-			System.out.println("Customer Interactions is not around 60%");
+			System.out.println("Customer Interactions is " + String.valueOf(customerRatio * 100) + "%");
 			fail_customer_rate = 1;
 		}
 
 		float avgLatency = latency / successfulInteractions;
 		System.out.println("result: " + throughput + ", " + avgLatency);
 
+		String is_binary = BookStoreConstants.BINARY_SERIALIZATION ? "1" : "0";
+		int client_max_threadpool_threads = BookStoreClientConstants.CLIENT_MAX_THREADSPOOL_THREADS;
+		int min_server_threadpool = BookStoreHTTPServer.getMinThreadpoolSize();
+		int max_server_threadpool = BookStoreHTTPServer.getMaxThreadpoolSize();
+
 		String[] dataline = new String[]
-				{String.valueOf(workerRunResults.size()), String.valueOf(throughput), String.valueOf(avgLatency), String.valueOf(fail_goodput), String.valueOf(fail_customer_rate)};
+				{String.valueOf(workerRunResults.size()), String.valueOf(throughput), String.valueOf(avgLatency), String.valueOf(fail_goodput), String.valueOf(fail_customer_rate), is_binary, String.valueOf(client_max_threadpool_threads), String.valueOf(min_server_threadpool), String.valueOf(max_server_threadpool), local};
 		String line = Stream.of(dataline).collect(Collectors.joining(","));
+
+		//Number of clients,throughput,latency,fail goodput,fail customer rate,binary serialization,client max threadpool threads,server min threadpool size,server max threadpool size,address space
 		try {
 
 			FileWriter fw = new FileWriter("./result.csv", true);
@@ -162,10 +173,11 @@ public class CertainWorkload {
 	 */
 	public static void initializeBookStoreData(BookStore bookStore,
 			StockManager stockManager) throws BookStoreException {
+		stockManager.removeAllBooks();
 
 		// TODO: You should initialize data for your bookstore here
-		Random random = new Random();
-		int n = 50 + random.nextInt(20);
-		stockManager.addBooks(new BookSetGenerator().nextSetOfStockBooksWithRange(n, 1, n*3));
+//		Random random = new Random();
+		int n = 250;
+		stockManager.addBooks(new BookSetGenerator().nextSetOfStockBooksWithRange(n, 1, n+1));
 	}
 }

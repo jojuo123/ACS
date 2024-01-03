@@ -14,7 +14,15 @@ public class BookStoreHTTPServer {
 	/** The Constant defaultListenOnPort. */
 	private static final int DEFAULT_PORT = 8081;
 	private static final int MIN_THREADPOOL_SIZE = 10;
-	private static final int MAX_THREADPOOL_SIZE = 100;
+	private static final int MAX_THREADPOOL_SIZE = 200;
+
+	public static int getMinThreadpoolSize() {
+		return MIN_THREADPOOL_SIZE;
+	}
+
+	public static int getMaxThreadpoolSize() {
+		return MAX_THREADPOOL_SIZE;
+	}
 
 	/**
 	 * Prevents the instantiation of a new {@link BookStoreHTTPServer}.
