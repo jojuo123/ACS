@@ -10,14 +10,14 @@ import com.acertainbookstore.interfaces.StockManager;
  * 
  */
 public class WorkloadConfiguration {
-	private int numBooksToBuy = 5;
-	private int numBookCopiesToBuy = 4;
+	private int numBooksToBuy = 10;
+	private int numBookCopiesToBuy = 2;
 	private int numEditorPicksToGet = 30;
-	private int numAddCopies = 20;
-	private int numBooksToAdd = 30;
-	private int numBooksWithLeastCopies = 30;
+	private int numAddCopies = 40;
+	private int numBooksToAdd = 50;
+	private int numBooksWithLeastCopies = 20;
 	private int warmUpRuns = 100;
-	private int numActualRuns = 500;
+	private int numActualRuns = 1000;
 	private float percentRareStockManagerInteraction = 10f;
 	private float percentFrequentStockManagerInteraction = 30f;
 	private BookSetGenerator bookSetGenerator = null;
@@ -31,7 +31,7 @@ public class WorkloadConfiguration {
 //		bookSetGenerator = new BookSetGenerator();
 		this.bookSetGenerator = new BookSetGenerator(
 				10, 20, 5.0f, 20.0f,
-				5, 70, 0, 10,
+				15, 70, 0, 10,
 				5, 100, 0.5f
 		);
 		this.bookStore = bookStore;

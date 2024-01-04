@@ -43,60 +43,64 @@ public class CertainWorkload {
 	 */
 	public static void main(String[] args) throws Exception {
 		dataLines = new ArrayList<>();
-		int numConcurrentWorkloadThreads = 100;
-		String serverAddress = "http://localhost:8081";
-		boolean localTest = false;
-		local = localTest ? "local" : "RPC";
-		List<WorkerRunResult> workerRunResults = new ArrayList<WorkerRunResult>();
-		List<Future<WorkerRunResult>> runResults = new ArrayList<Future<WorkerRunResult>>();
+		for (int times = 0; times < 5; times++) {
+			for (int numConcurrentWorkloadThreads = 10; numConcurrentWorkloadThreads <= 100; numConcurrentWorkloadThreads+=10) {
+//			int numConcurrentWorkloadThreads = 10;
+				String serverAddress = "http://localhost:8081";
+				boolean localTest = false;
+				local = localTest ? "local" : "RPC";
+				List<WorkerRunResult> workerRunResults = new ArrayList<WorkerRunResult>();
+				List<Future<WorkerRunResult>> runResults = new ArrayList<Future<WorkerRunResult>>();
 
-		// Initialize the RPC interfaces if its not a localTest, the variable is
-		// overriden if the property is set
-		String localTestProperty = System
-				.getProperty(BookStoreConstants.PROPERTY_KEY_LOCAL_TEST);
-		localTest = (localTestProperty != null) ? Boolean
-				.parseBoolean(localTestProperty) : localTest;
+				// Initialize the RPC interfaces if its not a localTest, the variable is
+				// overriden if the property is set
+				String localTestProperty = System
+						.getProperty(BookStoreConstants.PROPERTY_KEY_LOCAL_TEST);
+				localTest = (localTestProperty != null) ? Boolean
+						.parseBoolean(localTestProperty) : localTest;
 
-		BookStore bookStore = null;
-		StockManager stockManager = null;
-		if (localTest) {
-			CertainBookStore store = new CertainBookStore();
-			bookStore = store;
-			stockManager = store;
-		} else {
-			stockManager = new StockManagerHTTPProxy(serverAddress + "/stock");
-			bookStore = new BookStoreHTTPProxy(serverAddress);
+				BookStore bookStore = null;
+				StockManager stockManager = null;
+				if (localTest) {
+					CertainBookStore store = new CertainBookStore();
+					bookStore = store;
+					stockManager = store;
+				} else {
+					stockManager = new StockManagerHTTPProxy(serverAddress + "/stock");
+					bookStore = new BookStoreHTTPProxy(serverAddress);
+				}
+
+				// Generate data in the bookstore before running the workload
+				initializeBookStoreData(bookStore, stockManager);
+
+				ExecutorService exec = Executors
+						.newFixedThreadPool(numConcurrentWorkloadThreads);
+
+				for (int i = 0; i < numConcurrentWorkloadThreads; i++) {
+					WorkloadConfiguration config = new WorkloadConfiguration(bookStore,
+							stockManager);
+					Worker workerTask = new Worker(config);
+					// Keep the futures to wait for the result from the thread
+					runResults.add(exec.submit(workerTask));
+				}
+
+				// Get the results from the threads using the futures returned
+				for (Future<WorkerRunResult> futureRunResult : runResults) {
+					WorkerRunResult runResult = futureRunResult.get(); // blocking call
+					workerRunResults.add(runResult);
+				}
+
+				exec.shutdownNow(); // shutdown the executor
+
+				// Finished initialization, stop the clients if not localTest
+				if (!localTest) {
+					((BookStoreHTTPProxy) bookStore).stop();
+					((StockManagerHTTPProxy) stockManager).stop();
+				}
+
+				reportMetric(workerRunResults);
+			}
 		}
-
-		// Generate data in the bookstore before running the workload
-		initializeBookStoreData(bookStore, stockManager);
-
-		ExecutorService exec = Executors
-				.newFixedThreadPool(numConcurrentWorkloadThreads);
-
-		for (int i = 0; i < numConcurrentWorkloadThreads; i++) {
-			WorkloadConfiguration config = new WorkloadConfiguration(bookStore,
-					stockManager);
-			Worker workerTask = new Worker(config);
-			// Keep the futures to wait for the result from the thread
-			runResults.add(exec.submit(workerTask));
-		}
-
-		// Get the results from the threads using the futures returned
-		for (Future<WorkerRunResult> futureRunResult : runResults) {
-			WorkerRunResult runResult = futureRunResult.get(); // blocking call
-			workerRunResults.add(runResult);
-		}
-
-		exec.shutdownNow(); // shutdown the executor
-
-		// Finished initialization, stop the clients if not localTest
-		if (!localTest) {
-			((BookStoreHTTPProxy) bookStore).stop();
-			((StockManagerHTTPProxy) stockManager).stop();
-		}
-
-		reportMetric(workerRunResults);
 	}
 
 	/**
@@ -148,12 +152,12 @@ public class CertainWorkload {
 		int max_server_threadpool = BookStoreHTTPServer.getMaxThreadpoolSize();
 
 		String[] dataline = new String[]
-				{String.valueOf(workerRunResults.size()), String.valueOf(throughput), String.valueOf(avgLatency), String.valueOf(fail_goodput), String.valueOf(fail_customer_rate), is_binary, String.valueOf(client_max_threadpool_threads), String.valueOf(min_server_threadpool), String.valueOf(max_server_threadpool), local, "computer 1"};
+				{String.valueOf(workerRunResults.size()), String.valueOf(throughput), String.valueOf(avgLatency), String.valueOf(fail_goodput), String.valueOf(fail_customer_rate), is_binary, String.valueOf(client_max_threadpool_threads), String.valueOf(min_server_threadpool), String.valueOf(max_server_threadpool), local, "computer 3"};
 		String line = Stream.of(dataline).collect(Collectors.joining(","));
 
 		//Number of clients,throughput,latency,fail goodput,fail customer rate,binary serialization,client max threadpool threads,server min threadpool size,server max threadpool size,address space,machine
 		try {
-			FileWriter fw = new FileWriter("./result.csv", true);
+			FileWriter fw = new FileWriter("./result2.csv", true);
 			BufferedWriter bw = new BufferedWriter(fw);
 			bw.write(line);
 			System.out.println(line);

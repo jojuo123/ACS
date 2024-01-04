@@ -21,7 +21,7 @@ public class BookSetGenerator {
 	private int max_length_title = 20;
 	private float max_price = 20.0f;
 	private float min_price = 5.0f;
-	private int min_copies = 5;
+	private int min_copies = 15;
 	private int max_copies = 70;
 	private int min_sale_misses = 0;
 	private int max_sale_misses = 10;

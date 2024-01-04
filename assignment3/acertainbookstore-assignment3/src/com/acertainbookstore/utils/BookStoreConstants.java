@@ -9,7 +9,7 @@ public final class BookStoreConstants {
 	/**
 	 * The Constant BINARY_SERIALIZATION decides whether we use Kryo or XStream.
 	 */
-	public static final boolean BINARY_SERIALIZATION = false;
+	public static final boolean BINARY_SERIALIZATION = true;
 
 	// Constants used when creating URLs
 
