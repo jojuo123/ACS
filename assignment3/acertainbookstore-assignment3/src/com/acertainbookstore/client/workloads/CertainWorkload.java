@@ -43,9 +43,9 @@ public class CertainWorkload {
 	 */
 	public static void main(String[] args) throws Exception {
 		dataLines = new ArrayList<>();
-		int numConcurrentWorkloadThreads = 500;
+		int numConcurrentWorkloadThreads = 100;
 		String serverAddress = "http://localhost:8081";
-		boolean localTest = true;
+		boolean localTest = false;
 		local = localTest ? "local" : "RPC";
 		List<WorkerRunResult> workerRunResults = new ArrayList<WorkerRunResult>();
 		List<Future<WorkerRunResult>> runResults = new ArrayList<Future<WorkerRunResult>>();
