@@ -148,12 +148,11 @@ public class CertainWorkload {
 		int max_server_threadpool = BookStoreHTTPServer.getMaxThreadpoolSize();
 
 		String[] dataline = new String[]
-				{String.valueOf(workerRunResults.size()), String.valueOf(throughput), String.valueOf(avgLatency), String.valueOf(fail_goodput), String.valueOf(fail_customer_rate), is_binary, String.valueOf(client_max_threadpool_threads), String.valueOf(min_server_threadpool), String.valueOf(max_server_threadpool), local};
+				{String.valueOf(workerRunResults.size()), String.valueOf(throughput), String.valueOf(avgLatency), String.valueOf(fail_goodput), String.valueOf(fail_customer_rate), is_binary, String.valueOf(client_max_threadpool_threads), String.valueOf(min_server_threadpool), String.valueOf(max_server_threadpool), local, "computer 1"};
 		String line = Stream.of(dataline).collect(Collectors.joining(","));
 
-		//Number of clients,throughput,latency,fail goodput,fail customer rate,binary serialization,client max threadpool threads,server min threadpool size,server max threadpool size,address space
+		//Number of clients,throughput,latency,fail goodput,fail customer rate,binary serialization,client max threadpool threads,server min threadpool size,server max threadpool size,address space,machine
 		try {
-
 			FileWriter fw = new FileWriter("./result.csv", true);
 			BufferedWriter bw = new BufferedWriter(fw);
 			bw.write(line);
